@@ -3,11 +3,14 @@ require(pacman)
 pacman::p_load(magrittr, rgdal, ggplot2, sp, sf, data.table, tictoc, stringr, dplyr,
                tibble, geojsonio, readr, glue, webdriver, purrr, cli, fs)
 library(tidyverse)
-
-# library(arcgisbinding)
-# arc.check_product()
+library(qgisprocess)
+library(arcgisbinding)
+arc.check_product()
 # install.packages("webdriver")
 # webdriver::install_phantomjs()
+qgis_configure(use_cached_data = TRUE)
+
+
 
 getwd()
 
@@ -99,9 +102,9 @@ jsonnames<-c("mpuntos_fusion.geojson", "mlineas_fusion.geojson")
 
 # read into R and adjust columns  -------------------------------------------------------
 for(json in jsonnames){
-  cat("cargando", json, "...", '\n\r')
   nombre<-str_extract(json, "\\S+(?=\\.)")
   assign(str_glue("{nombre}"), st_read(str_glue("{path}{json}"), as_tibble=TRUE))
+  cli::cli_alert_success("Capa {json} cargada exitosamente.")
 }
 
 # dissolve function  --------------------------------------------------------------------
@@ -110,30 +113,20 @@ dissolve<-function(sf, tipo1){
   n1= nrow(sf)
   suppressWarnings(sf1<- st_cast(sf, tipo1))
   n2= nrow(sf1)
-  n3= n2 - nrow(sf1)
-  # if(tipo1=="POINT"){
-  #   coords <- st_coordinates(sf1) # Extract the coordinates of each point
-  #   zero_coords <- (coords[,1] == 0) & (coords[,2] == 0) # Identify the points with zero coordinates
-  #   sf1 <- sf1[!zero_coords, ] # Subset the shapefile to exclude points with zero coordinates
-  #   sf1<-sf1 %>% select(cod_bip, geometry)
-  #   n3= n2 - nrow(sf1)
-  # }else{
-  #   sf1<-sf1 %>% select(cod_bip, geometry)
-  #   n3= 0
-  # }
-  sf1<-sf1[!duplicated(sf1),]
   sf1<-sf1 %>% filter(str_count(cod_bip)>=8, cod_bip!="undefined")
   sf1$cod_bip<-substr(sf1$cod_bip, 1, 8)
-  n4=nrow(sf1)
-  shp<-sf1 |> group_by(cod_bip) |> dplyr::summarize(st_combine(geometry)) |> dplyr::ungroup()
-  n5 = nrow(shp)
-  shp<-st_cast(shp, str_glue("MULTI{tipo1}"))
-  cat("INFORME: \n",
-  "1) SF original venía con ", str_glue("{n1}"), " filas. \n",
-  "2) Se expandió a ", str_glue("{n2}"), " filas en paso dos. \n",
-  "3) Se borró ", str_glue("{n3}"), " filas con geometria de c(0,0). \n",
-  "4) En paso cuatro, se eliminó ", str_glue("{n4}"), " filas duplicadas y filas con errores en su cod_bip. \n",
-  "5) Al final, el dissolve nos deja con un SF con ", str_glue("{n5}"), " filas. ")
+  sf2<-sf1 %>% select(contains("cod_bip"))
+  sf2<-sf2[!duplicated(sf2),]
+  n3=nrow(sf2)
+  # shp<-sf1 |> group_by(cod_bip) |> dplyr::summarize(st_combine(geometry)) |> dplyr::ungroup()
+  shp<-qgis_run_algorithm("native:dissolve", INPUT = sf2, FIELD="cod_bip", SEPARATE_DISJOINT = FALSE)
+  shp<-st_as_sf(shp)
+  n4 = nrow(shp)
+  # shp<-st_cast(shp, str_glue("MULTI{tipo1}"))
+  cli::cli_alert_success("INFORME: \n 1) SF original venía con {n1} filas. \n
+                         2) Se expandió a {n2} filas en paso dos. \n
+                         3) Se eliminó {n2-n3} filas duplicadas y filas con errores en su cod_bip. \n
+                         5) Al final, el dissolve nos deja con un SF con {n4} filas. ")
   toc()
   shp
 }
@@ -143,6 +136,7 @@ puntos_dissolve<-dissolve(mpuntos_fusion, "POINT")
 lineas_dissolve<-dissolve(mlineas_fusion, "LINESTRING")
 
 # export as shapes into folder*  --------------------------------------------------------
-st_write(puntos_dissolve, str_glue("{path}shapes/puntos_dissolve.shp"))
-st_write(lineas_dissolve, str_glue("{path}shapes/lineas_dissolve.shp"))
+st_write(puntos_dissolve, str_glue("{path}shapes/puntos_dissolve.shp"), delete_dsn=TRUE)
+st_write(lineas_dissolve, str_glue("{path}shapes/lineas_dissolve.shp"), delete_dsn=TRUE)
+
 
