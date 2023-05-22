@@ -58,6 +58,7 @@ tbl_geoserver <- list_rbind(tbl_geoserver)
 archivos <- tbl_geoserver |> pull(name)
 xx<-archivos %>% str_detect("fusion")
 archivos<-archivos[xx]
+rm(xx)
 
 # revisa que archivos tienen columnas bip y las descarga
 resultados <- map(archivos, safely(function(name = "sit:mpuntos_fusion"){
@@ -109,16 +110,17 @@ dissolve<-function(sf, tipo1){
   n1= nrow(sf)
   suppressWarnings(sf1<- st_cast(sf, tipo1))
   n2= nrow(sf1)
-  if(tipo1=="POINT"){
-    coords <- st_coordinates(sf1) # Extract the coordinates of each point
-    zero_coords <- (coords[,1] == 0) & (coords[,2] == 0) # Identify the points with zero coordinates
-    sf1 <- sf1[!zero_coords, ] # Subset the shapefile to exclude points with zero coordinates
-    sf1<-sf1 %>% select(cod_bip, geometry)
-    n3= n2 - nrow(sf1)
-  }else{
-    sf1<-sf1 %>% select(cod_bip, geometry)
-    n3= 0
-  }
+  n3= n2 - nrow(sf1)
+  # if(tipo1=="POINT"){
+  #   coords <- st_coordinates(sf1) # Extract the coordinates of each point
+  #   zero_coords <- (coords[,1] == 0) & (coords[,2] == 0) # Identify the points with zero coordinates
+  #   sf1 <- sf1[!zero_coords, ] # Subset the shapefile to exclude points with zero coordinates
+  #   sf1<-sf1 %>% select(cod_bip, geometry)
+  #   n3= n2 - nrow(sf1)
+  # }else{
+  #   sf1<-sf1 %>% select(cod_bip, geometry)
+  #   n3= 0
+  # }
   sf1<-sf1[!duplicated(sf1),]
   sf1<-sf1 %>% filter(str_count(cod_bip)>=8, cod_bip!="undefined")
   sf1$cod_bip<-substr(sf1$cod_bip, 1, 8)
