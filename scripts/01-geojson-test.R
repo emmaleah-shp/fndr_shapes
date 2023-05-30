@@ -3,16 +3,18 @@ require(pacman)
 pacman::p_load(magrittr, rgdal, ggplot2, sp, sf, data.table, tictoc, stringr, dplyr,
                tibble, geojsonio, readr, glue, webdriver, purrr, cli, fs)
 library(tidyverse)
+install.packages("remotes")
+remotes::install_github("r-spatial/qgisprocess")
 library(qgisprocess)
-library(arcgisbinding)
-arc.check_product()
+# library(arcgisbinding)
+# arc.check_product()
 # install.packages("webdriver")
 # webdriver::install_phantomjs()
 qgis_configure(use_cached_data = TRUE)
 
-
-
-getwd()
+# qgis_algorithms() %>% view()
+#
+# getwd()
 
 # start and session -------------------------------------------------------
 pjs <- run_phantomjs()
